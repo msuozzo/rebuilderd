@@ -67,6 +67,7 @@ pub struct RebuildArtifact {
     pub diffoscope_log_id: Option<i32>,
     pub attestation_log_id: Option<i32>,
     pub status: Option<String>,
+    pub stabilizer: Option<String>,
 }
 
 #[derive(Insertable, PartialEq, Eq, Debug, Clone)]
@@ -78,6 +79,7 @@ pub struct NewRebuildArtifact {
     pub diffoscope_log_id: Option<i32>,
     pub attestation_log_id: Option<i32>,
     pub status: Option<String>,
+    pub stabilizer: Option<String>,
 }
 
 impl NewRebuildArtifact {

@@ -23,6 +23,7 @@ build() {
 package_rebuilderd() {
   pkgdesc='Independent verification system of binary packages (server package)'
   depends=('rebuilderd-tools' 'sqlite' 'archlinux-repro')
+  optdepends=('python: stabilizer for Alpine packages')
   backup=('etc/rebuilderd.conf'
           'etc/rebuilderd-sync.conf'
           'etc/rebuilderd-worker.conf')
@@ -32,9 +33,10 @@ package_rebuilderd() {
     target/release/rebuilderd \
     target/release/rebuilderd-worker
 
-  # install rebuilder scripts
+  # install rebuilder scripts and stabilizers
   install -Dm 755 -t "${pkgdir}/usr/libexec/rebuilderd" \
-    worker/rebuilder-*.sh
+    worker/rebuilder-*.sh \
+    worker/stabilizer-*
 
   # install config files
   install -Dm 644 -t "${pkgdir}/etc" \

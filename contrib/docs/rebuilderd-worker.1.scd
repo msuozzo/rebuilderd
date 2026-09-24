@@ -26,10 +26,16 @@ is loaded from */etc/rebuilderd-worker.conf*, see *rebuilderd-worker.conf*(5).
 
 # BUILD
 
-*rebuilderd-worker* build <distro> <url>
+*rebuilderd-worker* build [--stabilizer <path>] <distro> <url>
 
 This is a small wrapper around the rebuilder scripts that are used by
 rebuilderd-worker.
+
+*--stabilizer* <path>
+	If the rebuilt artifact is not bit-for-bit identical, pass both the
+	upstream and the rebuilt artifact through this executable and compare them
+	again. This overrides the stabilizer configured for the backend, see
+	*rebuilderd-worker.conf*(5).
 
 # SEE ALSO
 

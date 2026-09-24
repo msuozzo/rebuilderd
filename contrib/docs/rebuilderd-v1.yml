@@ -1079,6 +1079,10 @@ components:
           description: The ID of the latest artifact of this package
           type: integer
           nullable: true
+        stabilizer:
+          description: The file name of the stabilizer that was needed to verify the latest artifact of this package, null if it was bit-for-bit identical (or did not match)
+          type: string
+          nullable: true
       additionalProperties: false
       required:
         - name
@@ -1234,6 +1238,10 @@ components:
           type: boolean
         status:
           $ref: '#/components/schemas/ArtifactStatus'
+        stabilizer:
+          description: The file name of the stabilizer that was needed to verify the artifact, null if it was bit-for-bit identical (or did not match)
+          type: string
+          nullable: true
       additionalProperties: false
       required:
         - name
@@ -1286,6 +1294,10 @@ components:
               nullable: true
             status:
               $ref: '#/components/schemas/ArtifactStatus'
+            stabilizer:
+              description: The file name of the stabilizer both artifacts had to be passed through before they were identical, null if they were bit-for-bit identical (or did not match)
+              type: string
+              nullable: true
           additionalProperties: false
           required:
             - name

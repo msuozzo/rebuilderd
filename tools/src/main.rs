@@ -266,10 +266,15 @@ async fn main() -> Result<()> {
                             package.architecture,
                         );
 
+                        let stabilizer = package
+                            .stabilizer
+                            .map(|name| format!(" (stabilized: {})", name))
+                            .unwrap_or_default();
+
                         if writeln!(
                             stdout,
-                            "{} {:-60} ({}) {:?}",
-                            status_str, pkg_str, info, package.url,
+                            "{} {:-60} ({}) {:?}{}",
+                            status_str, pkg_str, info, package.url, stabilizer,
                         )
                         .is_err()
                         {

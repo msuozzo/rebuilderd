@@ -103,6 +103,12 @@ pub struct RebuildArtifactReport {
     pub diffoscope: Option<Vec<u8>>,
     pub attestation: Option<Vec<u8>>,
     pub status: ArtifactStatus,
+    /// The file name of the stabilizer (e.g. `stabilizer-alpine.py`) that
+    /// both the upstream and the rebuilt artifact had to be passed through
+    /// before they compared equal. `None` means the artifacts were bit-for-bit
+    /// identical (or did not match at all).
+    #[serde(default)]
+    pub stabilizer: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, clap::ValueEnum)]
@@ -204,4 +210,7 @@ pub struct RebuildArtifact {
     pub has_diffoscope: bool,
     pub has_attestation: bool,
     pub status: Option<ArtifactStatus>,
+    /// The file name of the stabilizer that was needed to verify this
+    /// artifact, `None` if it was bit-for-bit identical (or did not match).
+    pub stabilizer: Option<String>,
 }

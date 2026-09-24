@@ -93,6 +93,13 @@ pub async fn report_good_rebuild(client: &Client) {
     client.submit_build_report(report).await.unwrap();
 }
 
+pub async fn report_good_stabilized_rebuild(client: &Client) {
+    let job = pick_up_job(client).await;
+    let report = good_stabilized_rebuild_report(&job);
+
+    client.submit_build_report(report).await.unwrap();
+}
+
 pub async fn report_good_rebuild_with_signed_attestation(client: &Client) {
     let job = pick_up_job(client).await;
     let report = good_rebuild_report_with_signed_attestation(&job).await;

@@ -13,7 +13,7 @@ use rebuilderd_common::utils::zstd_compress;
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -160,48 +160,115 @@ pub async fn rebuild(
     for (artifact, artifact_filename, artifact_path) in artifacts {
         let output_path = out_dir.join(&artifact_filename);
 
-        let result = if !output_path.exists() {
+        if !output_path.exists() {
             info!(
                 "No output artifact found, marking as BAD: {:?}",
                 output_path
             );
 
-            RebuildArtifactReport {
+            results.push(RebuildArtifactReport {
                 name: artifact.name,
                 diffoscope: None,
                 attestation: None,
                 status: ArtifactStatus::Bad,
+                stabilizer: None,
+            });
+            continue;
+        }
+
+        // phase 1: bit-for-bit comparison
+        let identical = compare_files(&artifact_path, &output_path).await?;
+
+        // phase 2: if the artifacts differ and the backend has a stabilizer,
+        // pass both of them through it and compare the stabilized copies
+        let stabilized = match &ctx.backend.stabilizer {
+            Some(stabilizer) if !identical => Some(
+                stabilize_artifacts(
+                    stabilizer,
+                    &artifact_path,
+                    &output_path,
+                    &tmp.path().join("stabilized"),
+                    &ctx.build,
+                    log,
+                )
+                .await?,
+            ),
+            _ => None,
+        };
+        let stabilized_identical = if let Some(stabilized) = &stabilized {
+            compare_files(&stabilized.upstream, &stabilized.rebuild).await?
+        } else {
+            false
+        };
+
+        let result = if identical || stabilized_identical {
+            // stabilized copies only exist if the artifacts are not bit-for-bit identical
+            if stabilized.is_some() {
+                info!(
+                    "Stabilized artifacts are identical, marking as GOOD: {:?}",
+                    output_path
+                );
+            } else {
+                info!(
+                    "Output artifacts is identical, marking as GOOD: {:?}",
+                    output_path
+                );
             }
-        } else if compare_files(&artifact_path, &output_path).await? {
-            info!(
-                "Output artifacts is identical, marking as GOOD: {:?}",
-                output_path
-            );
 
             let mut res = RebuildArtifactReport {
                 name: artifact.name,
                 diffoscope: None,
                 attestation: None,
                 status: ArtifactStatus::Good,
+                stabilizer: stabilized.as_ref().map(|s| s.name.clone()),
             };
 
             info!("Generating signed link");
+            let (materials, products, lstrip) = if let Some(stabilized) = &stabilized {
+                // The rebuilt artifact only matches upstream after stabilizing,
+                // so the product of this link is the stabilized rebuilt artifact.
+                // The materials are the build input, the upstream artifact, the
+                // unmodified rebuilt artifact and the stabilizer itself, so the
+                // link also pins the transformation that has been applied.
+                let mut materials = vec![path_to_string(&input_path)?];
+                if artifact_path != input_path {
+                    materials.push(path_to_string(&artifact_path)?);
+                }
+                materials.push(path_to_string(&output_path)?);
+                materials.push(path_to_string(&stabilized.path)?);
+                // the upstream and the rebuilt artifact share a file name,
+                // only strip the tmp dir so inputs/, out/ and stabilized/
+                // can still be told apart
+                let lstrip = vec![format!("{}/", path_to_string(tmp.path())?)];
+                (
+                    materials,
+                    vec![path_to_string(&stabilized.rebuild)?],
+                    lstrip,
+                )
+            } else {
+                let lstrip = vec![
+                    format!("{}/", path_to_string(&inputs_dir)?),
+                    format!("{}/", path_to_string(&out_dir)?),
+                ];
+                (
+                    vec![path_to_string(&input_path)?],
+                    vec![path_to_string(&output_path)?],
+                    lstrip,
+                )
+            };
+            let materials = materials.iter().map(String::as_str).collect::<Vec<_>>();
+            let products = products.iter().map(String::as_str).collect::<Vec<_>>();
+            let lstrip = lstrip.iter().map(String::as_str).collect::<Vec<_>>();
+
             match in_toto_run(
                 &format!("rebuild {}", artifact_filename.to_str().unwrap()),
                 None,
-                &[input_path
-                    .to_str()
-                    .ok_or_else(|| anyhow!("Input path contains invalid characters"))?],
-                &[output_path
-                    .to_str()
-                    .ok_or_else(|| anyhow!("Output path contains invalid characters"))?],
+                &materials,
+                &products,
                 &[],
                 Some(ctx.privkey),
                 Some(&["sha512", "sha256"]),
-                Some(&[
-                    &format!("{}/", inputs_dir.to_str().unwrap()),
-                    &format!("{}/", out_dir.to_str().unwrap()),
-                ]),
+                Some(&lstrip),
             ) {
                 Ok(signed_link) => {
                     info!("Signed link generated");
@@ -227,11 +294,20 @@ pub async fn rebuild(
                 diffoscope: None,
                 attestation: None,
                 status: ArtifactStatus::Bad,
+                stabilizer: None,
             };
 
             // generate diffoscope diff if enabled
             if ctx.diffoscope.enabled {
-                let diff = diffoscope(&artifact_path, &output_path, &ctx.diffoscope)
+                // if both artifacts have been stabilized, diff the stabilized
+                // copies instead: the diff then only shows what the stabilizer
+                // could not account for
+                let (a, b) = if let Some(stabilized) = &stabilized {
+                    (&stabilized.upstream, &stabilized.rebuild)
+                } else {
+                    (&artifact_path, &output_path)
+                };
+                let diff = diffoscope(a, b, &ctx.diffoscope)
                     .await
                     .context("Failed to run diffoscope")?;
 
@@ -248,6 +324,96 @@ pub async fn rebuild(
     }
 
     Ok(results)
+}
+
+/// Stabilized copies of an upstream and a rebuilt artifact
+struct Stabilized {
+    /// The file name of the stabilizer, as configured
+    name: String,
+    /// The absolute path of the stabilizer
+    path: PathBuf,
+    upstream: PathBuf,
+    rebuild: PathBuf,
+}
+
+/// Passes both the upstream and the rebuilt artifact through the stabilizer
+async fn stabilize_artifacts(
+    stabilizer: &Path,
+    artifact_path: &Path,
+    output_path: &Path,
+    stabilized_dir: &Path,
+    build: &config::Build,
+    log: &mut log::Buffer,
+) -> Result<Stabilized> {
+    let name = stabilizer
+        .file_name()
+        .with_context(|| anyhow!("Invalid stabilizer path: {:?}", stabilizer))?
+        .to_string_lossy()
+        .into_owned();
+    let path = fs::canonicalize(stabilizer)
+        .with_context(|| anyhow!("Failed to resolve stabilizer {:?}", stabilizer))?;
+
+    info!(
+        "Output artifact differs, stabilizing both artifacts with {:?}",
+        path
+    );
+    let upstream = stabilize(
+        &path,
+        artifact_path,
+        &stabilized_dir.join("upstream"),
+        build,
+        log,
+    )
+    .await?;
+    let rebuild = stabilize(
+        &path,
+        output_path,
+        &stabilized_dir.join("rebuild"),
+        build,
+        log,
+    )
+    .await?;
+
+    Ok(Stabilized {
+        name,
+        path,
+        upstream,
+        rebuild,
+    })
+}
+
+/// Runs `<stabilizer> <src> <dst_dir>/<file name of src>` and returns the path
+/// of the stabilized copy.
+async fn stabilize(
+    stabilizer: &Path,
+    src: &Path,
+    dst_dir: &Path,
+    build: &config::Build,
+    log: &mut log::Buffer,
+) -> Result<PathBuf> {
+    fs::create_dir_all(dst_dir)
+        .with_context(|| anyhow!("Failed to create stabilizer output dir {:?}", dst_dir))?;
+    let dst = dst_dir.join(
+        src.file_name()
+            .with_context(|| anyhow!("Artifact path has no file name: {:?}", src))?,
+    );
+
+    let timeout = build.timeout.unwrap_or(3600 * 24); // 24h
+    let opts = proc::Options {
+        timeout: Duration::from_secs(timeout),
+        kill_at_size_limit: false,
+        passthrough: !build.silent,
+        envs: HashMap::new(),
+    };
+
+    if !proc::run(stabilizer, &[src, dst.as_path()], opts, log).await? {
+        bail!("Stabilizer {:?} failed on {:?}", stabilizer, src);
+    }
+    if !dst.exists() {
+        bail!("Stabilizer {:?} did not write {:?}", stabilizer, dst);
+    }
+
+    Ok(dst)
 }
 
 async fn verify(
@@ -322,5 +488,52 @@ mod tests {
             .await
             .unwrap();
         assert!(!equal);
+    }
+
+    fn write_stabilizer(dir: &Path, script: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir.join("stabilizer.sh");
+        fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    async fn run_stabilizer(script: &str) -> (tempfile::TempDir, PathBuf, Result<PathBuf>) {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("foo.pkg");
+        fs::write(&src, b"hello world\n").unwrap();
+        let stabilizer = write_stabilizer(dir.path(), script);
+
+        let mut log = log::Buffer::new(None, None);
+        let res = stabilize(
+            &stabilizer,
+            &src,
+            &dir.path().join("stabilized/upstream"),
+            &config::Build::default(),
+            &mut log,
+        )
+        .await;
+        (dir, src, res)
+    }
+
+    #[tokio::test]
+    async fn stabilize_identity() {
+        let (dir, src, res) = run_stabilizer(r#"cp "$1" "$2""#).await;
+        let dst = res.unwrap();
+        assert_eq!(dst, dir.path().join("stabilized/upstream/foo.pkg"));
+        assert!(compare_files(&src, &dst).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn stabilize_failure() {
+        let (_dir, _src, res) = run_stabilizer("exit 1").await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn stabilize_no_output() {
+        // exits successfully but doesn't write the output file
+        let (_dir, _src, res) = run_stabilizer("exit 0").await;
+        assert!(res.is_err());
     }
 }

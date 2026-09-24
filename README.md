@@ -63,6 +63,19 @@ and depend on /dev/kvm to be available. This is a special requirement for the
 hosting environment, you either need a VPS with **Nested KVM** or
 dedicated non-virtualized hardware.
 
+## Stabilizers
+
+Some package formats embed data that a rebuilder can never reproduce, for
+example Alpine's .apk files start with a signature by the Alpine signing key.
+For these a backend can be configured with a `stabilizer`, a program that
+turns an artifact into a canonical form (the reference
+[stabilizer-alpine.py](worker/stabilizer-alpine.py) drops the signature
+segment, keeping exactly the bytes that are covered by the signature). It's
+only used if the rebuilt artifact isn't bit-for-bit identical: both artifacts
+are passed through the stabilizer and compared again. A match is still
+reported as GOOD, but the stabilizer is recorded in the build report and the
+in-toto attestation, see `rebuilderd-worker.conf(5)`.
+
 # Accessing a rebuilderd instance in your browser
 
 Many instances run a web frontend to display their results. [rebuilderd-website]

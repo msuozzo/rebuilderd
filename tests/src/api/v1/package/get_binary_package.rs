@@ -1,3 +1,4 @@
+use crate::data::*;
 use crate::fixtures::server::IsolatedServer;
 use crate::fixtures::*;
 use crate::setup;
@@ -22,6 +23,18 @@ pub async fn returns_result_for_existing_id(mut isolated_server: IsolatedServer)
     let results = isolated_server.client.get_binary_package(1).await;
 
     assert!(results.is_ok());
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
+pub async fn returns_stabilizer_for_stabilized_rebuild(mut isolated_server: IsolatedServer) {
+    setup::single_good_stabilized_rebuild(&isolated_server.client).await;
+
+    let package = isolated_server.client.get_binary_package(1).await.unwrap();
+
+    assert_eq!(Some(DUMMY_STABILIZER.to_string()), package.stabilizer);
 
     isolated_server.shutdown().await;
 }

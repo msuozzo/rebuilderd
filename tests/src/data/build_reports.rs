@@ -7,6 +7,7 @@ use rebuilderd_common::utils::zstd_compress;
 
 pub const DUMMY_BUILD_LOG: &str = "build-log";
 pub const DUMMY_DIFFOSCOPE: &str = "diffoscope";
+pub const DUMMY_STABILIZER: &str = "stabilizer-dummy.sh";
 
 pub fn bad_rebuild_report(job: &QueuedJobWithArtifacts) -> RebuildReport {
     let mut artifacts = Vec::new();
@@ -16,6 +17,7 @@ pub fn bad_rebuild_report(job: &QueuedJobWithArtifacts) -> RebuildReport {
             diffoscope: Some(DUMMY_DIFFOSCOPE.to_string().into_bytes()),
             status: ArtifactStatus::Bad,
             attestation: None,
+            stabilizer: None,
         });
     }
 
@@ -46,6 +48,28 @@ pub fn good_rebuild_report(job: &QueuedJobWithArtifacts) -> RebuildReport {
             diffoscope: None,
             status: ArtifactStatus::Good,
             attestation: None,
+            stabilizer: None,
+        });
+    }
+
+    RebuildReport {
+        queue_id: job.job.id,
+        built_at: Utc::now().naive_utc(),
+        build_log: DUMMY_BUILD_LOG.to_string().into_bytes(),
+        status: BuildStatus::Good,
+        artifacts,
+    }
+}
+
+pub fn good_stabilized_rebuild_report(job: &QueuedJobWithArtifacts) -> RebuildReport {
+    let mut artifacts = Vec::new();
+    for artifact in job.artifacts.clone() {
+        artifacts.push(RebuildArtifactReport {
+            name: artifact.name.clone(),
+            diffoscope: None,
+            status: ArtifactStatus::Good,
+            attestation: None,
+            stabilizer: Some(DUMMY_STABILIZER.to_string()),
         });
     }
 
@@ -72,6 +96,7 @@ pub async fn good_rebuild_report_with_signed_attestation(
             diffoscope: None,
             status: ArtifactStatus::Good,
             attestation: Some(zstd_compress(attestation.as_bytes()).await.unwrap()),
+            stabilizer: None,
         });
     }
 
@@ -98,6 +123,7 @@ pub async fn good_rebuild_report_with_unsigned_attestation(
             diffoscope: None,
             status: ArtifactStatus::Good,
             attestation: Some(zstd_compress(attestation.as_bytes()).await.unwrap()),
+            stabilizer: None,
         });
     }
 

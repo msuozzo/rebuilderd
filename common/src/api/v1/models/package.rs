@@ -63,4 +63,8 @@ pub struct BinaryPackage {
     pub attestation_log_id: Option<i32>,
     pub last_seen: NaiveDateTime,
     pub seen_in_last_sync: bool,
+    /// The file name of the stabilizer that was needed to verify the latest
+    /// rebuild of this package, `None` if it was bit-for-bit identical (or
+    /// did not match).
+    pub stabilizer: Option<String>,
 }

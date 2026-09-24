@@ -208,6 +208,7 @@ pub async fn submit_rebuild_report(
                 diffoscope_log_id: logs.0,
                 attestation_log_id: logs.1,
                 status: Some(artifact_report.status.as_str().to_string()),
+                stabilizer: artifact_report.stabilizer.clone(),
             };
 
             new_rebuild_artifact.insert(connection.as_mut())?;
@@ -328,6 +329,7 @@ pub async fn get_build_artifacts(
             diffoscope_logs::diffoscope_log.nullable().is_not_null(),
             attestation_logs::attestation_log.nullable().is_not_null(),
             rebuild_artifacts::status,
+            rebuild_artifacts::stabilizer,
         ))
         .get_results::<api::v1::RebuildArtifact>(connection.as_mut())
         .map_err(Error::from)?;
@@ -356,6 +358,7 @@ pub async fn get_build_artifact(
             diffoscope_logs::diffoscope_log.nullable().is_not_null(),
             attestation_logs::attestation_log.nullable().is_not_null(),
             rebuild_artifacts::status,
+            rebuild_artifacts::stabilizer,
         ))
         .first::<api::v1::RebuildArtifact>(connection.as_mut())
         .optional()

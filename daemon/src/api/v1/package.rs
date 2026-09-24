@@ -104,6 +104,7 @@ fn binary_packages_base() -> _ {
             rebuild_artifacts::attestation_log_id.nullable(),
             source_packages::last_seen,
             source_packages::seen_in_last_sync,
+            rebuild_artifacts::stabilizer.nullable(),
         ))
 }
 
@@ -383,6 +384,7 @@ fn copy_existing_rebuilds(
                                 rebuild_artifacts::diffoscope_log_id,
                                 rebuild_artifacts::attestation_log_id,
                                 rebuild_artifacts::status,
+                                rebuild_artifacts::stabilizer,
                             )),
                     )
                     .into_columns((
@@ -391,6 +393,7 @@ fn copy_existing_rebuilds(
                         rebuild_artifacts::diffoscope_log_id,
                         rebuild_artifacts::attestation_log_id,
                         rebuild_artifacts::status,
+                        rebuild_artifacts::stabilizer,
                     ))
                     .execute(connection.as_mut())
                     .map_err(Error::from)?;

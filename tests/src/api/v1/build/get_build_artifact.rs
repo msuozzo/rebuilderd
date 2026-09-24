@@ -1,7 +1,8 @@
+use crate::data::*;
 use crate::fixtures::server::IsolatedServer;
 use crate::fixtures::*;
 use crate::setup;
-use rebuilderd_common::api::v1::BuildRestApi;
+use rebuilderd_common::api::v1::{ArtifactStatus, BuildRestApi};
 use rstest::rstest;
 
 #[rstest]
@@ -26,6 +27,21 @@ pub async fn returns_result_for_existing_id(mut isolated_server: IsolatedServer)
     let results = client.get_build_artifact(1, 1).await;
 
     assert!(results.is_ok());
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
+pub async fn returns_stabilizer_for_stabilized_artifact(mut isolated_server: IsolatedServer) {
+    let client = &isolated_server.client;
+
+    setup::single_good_stabilized_rebuild(client).await;
+
+    let artifact = client.get_build_artifact(1, 1).await.unwrap();
+
+    assert_eq!(Some(ArtifactStatus::Good), artifact.status);
+    assert_eq!(Some(DUMMY_STABILIZER.to_string()), artifact.stabilizer);
 
     isolated_server.shutdown().await;
 }

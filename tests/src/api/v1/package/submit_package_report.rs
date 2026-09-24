@@ -539,6 +539,46 @@ pub async fn existing_rebuilds_are_copied_from_friends(
 }
 
 #[rstest]
+#[tokio::test]
+pub async fn existing_rebuilds_are_copied_from_friends_with_stabilizer(
+    mut isolated_server: IsolatedServer,
+) {
+    let client = &isolated_server.client;
+
+    // first, a single package with a good rebuild that needed a stabilizer
+    setup::single_good_stabilized_rebuild(client).await;
+
+    // then, the friend of that package
+    client
+        .submit_package_report(&single_package_report_from_different_release())
+        .await
+        .unwrap();
+
+    let origin_filter = OriginFilter {
+        distribution: None,
+        release: Some(DUMMY_OTHER_RELEASE.to_string()),
+        component: None,
+        architecture: None,
+    };
+
+    let mut binary_packages = client
+        .get_binary_packages(None, Some(&origin_filter), None)
+        .await
+        .unwrap()
+        .records;
+
+    assert_eq!(1, binary_packages.len());
+
+    let binary_package = binary_packages.pop().unwrap();
+    assert_eq!(
+        Some(DUMMY_STABILIZER.to_string()),
+        binary_package.stabilizer
+    );
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
 #[case(OriginFilter{
         distribution: Some(DUMMY_OTHER_DISTRIBUTION.to_string()),
         release: None,

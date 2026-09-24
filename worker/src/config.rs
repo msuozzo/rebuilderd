@@ -41,6 +41,11 @@ pub struct Diffoscope {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Backend {
     pub path: PathBuf,
+    /// An executable that is invoked as `<stabilizer> <in> <out>` and writes a
+    /// canonical form of `<in>` to `<out>`. If the rebuilt artifact is not
+    /// bit-for-bit identical to upstream, both are passed through it and
+    /// compared again.
+    pub stabilizer: Option<PathBuf>,
 }
 
 pub fn load(args: &Args) -> Result<ConfigFile> {
@@ -74,8 +79,13 @@ pub fn load(args: &Args) -> Result<ConfigFile> {
             anyhow!("Invalid argument, expected format is --backend distro=/path/to/script")
         })?;
 
-        conf.backends
-            .insert(key.into(), Backend { path: path.into() });
+        conf.backends.insert(
+            key.into(),
+            Backend {
+                path: path.into(),
+                stabilizer: None,
+            },
+        );
     }
 
     Ok(conf)

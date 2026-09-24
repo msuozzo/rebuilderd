@@ -339,6 +339,67 @@ pub async fn package_is_not_requeued_after_good_report(mut isolated_server: Isol
 
 #[rstest]
 #[tokio::test]
+pub async fn binary_package_has_no_stabilizer_after_good_report(
+    mut isolated_server: IsolatedServer,
+) {
+    let client = &isolated_server.client;
+
+    setup::single_good_rebuild(client).await;
+
+    let package = client
+        .get_binary_packages(None, None, None)
+        .await
+        .map(|p| p.records)
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert_eq!(None, package.stabilizer);
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
+pub async fn can_report_good_stabilized_rebuild(mut isolated_server: IsolatedServer) {
+    let client = &isolated_server.client;
+
+    register_worker(client).await;
+    import_single_package(client).await;
+
+    let job = pick_up_job(client).await;
+    let report = good_stabilized_rebuild_report(&job);
+
+    client.submit_build_report(report).await.unwrap();
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
+pub async fn binary_package_is_marked_good_with_stabilizer_after_good_stabilized_report(
+    mut isolated_server: IsolatedServer,
+) {
+    let client = &isolated_server.client;
+
+    setup::single_good_stabilized_rebuild(client).await;
+
+    let package = client
+        .get_binary_packages(None, None, None)
+        .await
+        .map(|p| p.records)
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    assert_eq!(Some(ArtifactStatus::Good), package.status);
+    assert_eq!(Some(DUMMY_STABILIZER.to_string()), package.stabilizer);
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
 pub async fn can_report_good_rebuild_with_signed_attestation(mut isolated_server: IsolatedServer) {
     let client = &isolated_server.client;
 

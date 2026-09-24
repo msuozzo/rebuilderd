@@ -44,6 +44,9 @@ pub struct Build {
     /// Use diffoscope to generate a diff
     #[arg(long)]
     pub gen_diffoscope: bool,
+    /// Stabilizer to pass both artifacts through if they are not bit-for-bit identical
+    #[arg(long)]
+    pub stabilizer: Option<PathBuf>,
 }
 
 #[derive(Debug, Parser)]

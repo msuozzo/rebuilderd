@@ -47,6 +47,25 @@ pub async fn returns_correct_results_for_good_build(mut isolated_server: Isolate
 
     let artifact = &results[0];
     assert_eq!(DUMMY_BINARY_PACKAGE, artifact.name);
+    assert_eq!(None, artifact.stabilizer);
+
+    isolated_server.shutdown().await;
+}
+
+#[rstest]
+#[tokio::test]
+pub async fn returns_stabilizer_for_good_stabilized_build(mut isolated_server: IsolatedServer) {
+    let client = &isolated_server.client;
+
+    setup::single_good_stabilized_rebuild(client).await;
+
+    let results = client.get_build_artifacts(1).await.unwrap();
+
+    assert_eq!(1, results.len());
+
+    let artifact = &results[0];
+    assert_eq!(DUMMY_BINARY_PACKAGE, artifact.name);
+    assert_eq!(Some(DUMMY_STABILIZER.to_string()), artifact.stabilizer);
 
     isolated_server.shutdown().await;
 }

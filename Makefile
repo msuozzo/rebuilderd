@@ -17,7 +17,7 @@ install:
 		target/release/rebuilderd \
 		target/release/rebuildctl \
 		target/release/rebuilderd-worker
-	install -Dm 755	worker/rebuilder-*.sh -t "$(DESTDIR)/usr/libexec/rebuilderd/"
+	install -Dm 755	worker/rebuilder-*.sh worker/stabilizer-* -t "$(DESTDIR)/usr/libexec/rebuilderd/"
 	for f in rebuilderd.conf rebuilderd-sync.conf rebuilderd-worker.conf; do \
 		test -e "$(DESTDIR)/etc/$$f" || install -Dm 644 "contrib/confs/$$f" -t "$(DESTDIR)/etc" ; \
 	done

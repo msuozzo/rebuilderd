@@ -66,6 +66,7 @@ diesel::table! {
         diffoscope_log_id -> Nullable<Integer>,
         attestation_log_id -> Nullable<Integer>,
         status -> Nullable<Text>,
+        stabilizer -> Nullable<Text>,
     }
 }
 

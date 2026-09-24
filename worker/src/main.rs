@@ -234,9 +234,10 @@ async fn main() -> Result<()> {
         }
         // this is only really for debugging
         SubCommand::Build(build) => {
-            let backend = if let Some(script_location) = build.script_location {
+            let mut backend = if let Some(script_location) = build.script_location {
                 config::Backend {
                     path: script_location,
+                    stabilizer: None,
                 }
             } else {
                 config
@@ -245,6 +246,9 @@ async fn main() -> Result<()> {
                     .cloned()
                     .ok_or_else(|| anyhow!("No backend configured in config file"))?
             };
+            if let Some(stabilizer) = build.stabilizer {
+                backend.stabilizer = Some(stabilizer);
+            }
 
             let diffoscope = config::Diffoscope {
                 enabled: build.gen_diffoscope,
@@ -275,7 +279,14 @@ async fn main() -> Result<()> {
                 trace!("rebuild result object {:?}", res);
 
                 if res.status == ArtifactStatus::Good {
-                    info!("Package verified successfully");
+                    if let Some(stabilizer) = res.stabilizer {
+                        info!(
+                            "Package verified successfully (after stabilizing with {:?})",
+                            stabilizer
+                        );
+                    } else {
+                        info!("Package verified successfully (bit-for-bit)");
+                    }
                 } else {
                     error!("Package failed to verify");
                     if let Some(diffoscope) = res.diffoscope {
