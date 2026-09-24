@@ -17,7 +17,8 @@ commandline all the time.
 # OPTIONS
 
 _distro=_
-	The name of the distro, currently either *archlinux* or *debian*.
+	The name of the distro, currently *archlinux*, *debian*, *fedora*, *tails*
+	or *alpine*.
 
 _suite=_
 	This is for packages that have multiple suites/repositories, like *main*,
@@ -31,6 +32,9 @@ _releases=_
 	distributions like Arch Linux but is important for eg. Debian. If the same
 	version is present in multiple releases the package is only imported once.
 
+	For Alpine a release is a branch as spelled on the mirror, like *v3.24* or
+	*edge*. Don't use the *latest-stable* alias, it moves with every release.
+
 _source=_
 	This is the url we want to import from. For Arch Linux this might look
 	like:
@@ -38,6 +42,11 @@ _source=_
 	```
 	source = "https://ftp.halifax.rwth-aachen.de/archlinux/$repo/os/$arch"
 	```
+
+	For Alpine this is the base URL of an Alpine archive, not a mirror: the
+	mirror only keeps the newest version of each package, and the archive also
+	serves the build inputs (apkbuildinfo.json). See docs/alpine.md for the
+	routes it needs to serve.
 
 _maintainers=_ (optional)
 	Select packages from specific maintainers. The strings are supposed to match
@@ -85,6 +94,14 @@ source = "https://ftp.halifax.rwth-aachen.de/archlinux/$repo/os/$arch"
 #maintainers = ["somebody"]
 #pkgs = ["some-pkg", "python-*"]
 #excludes = ["tensorflow*"]
+
+## rebuild Alpine main and community of the v3.24 branch, one profile per branch
+[profile."alpine-v3.24"]
+distro = "alpine"
+components = ["main", "community"]
+architectures = ["x86_64", "aarch64"]
+releases = ["v3.24"]
+source = "https://archive.example.com/alpine"
 ```
 
 # AUTOMATIC SYNC

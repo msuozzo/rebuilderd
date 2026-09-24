@@ -2,6 +2,7 @@ use rebuilderd_common::errors::*;
 use rebuilderd_common::http;
 use std::fs;
 
+pub mod alpine;
 pub mod archlinux;
 pub mod debian;
 pub mod fedora;

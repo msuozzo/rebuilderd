@@ -10,7 +10,21 @@ RUN --mount=type=cache,target=/var/cache/buildkit \
     cp -v /var/cache/buildkit/alpine/target/release/rebuilderd-worker /
 
 FROM alpine:3.23
-RUN apk add --no-cache libgcc
+# python3 runs stabilizer-alpine.py
+RUN apk add --no-cache libgcc python3
+COPY --from=0 \
+    /usr/src/rebuilderd/worker/rebuilder-alpine.sh \
+    /usr/src/rebuilderd/worker/stabilizer-alpine.py \
+    /usr/local/libexec/rebuilderd/
 COPY --from=0 /rebuilderd-worker /usr/local/bin/
-ENV REBUILDERD_WORKER_BACKEND=alpine=/usr/local/libexec/rebuilderd/rebuilder-alpine.sh
+# No rebuild tool is included, add one and set REBUILDERD_ALPINE_REBUILDER,
+# see docs/alpine.md.
+# REBUILDERD_WORKER_BACKEND can't set a stabilizer, so the backend is
+# configured in a config file instead.
+RUN printf '%s\n' \
+    '[backend."alpine"]' \
+    'path = "/usr/local/libexec/rebuilderd/rebuilder-alpine.sh"' \
+    'stabilizer = "/usr/local/libexec/rebuilderd/stabilizer-alpine.py"' \
+    > /etc/rebuilderd-worker.conf
+ENV REBUILDERD_WORKER_CONFIG=/etc/rebuilderd-worker.conf
 ENTRYPOINT ["rebuilderd-worker"]

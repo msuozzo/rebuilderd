@@ -52,6 +52,7 @@ pub async fn sync(client: &Client, sync: PkgsSync) -> Result<()> {
 
     let http = http::client()?;
     let mut reports = match method {
+        "alpine" => schedule::alpine::sync(&http, &sync).await?,
         "archlinux" => schedule::archlinux::sync(&http, &sync).await?,
         "debian" => schedule::debian::sync(&http, &sync).await?,
         "fedora" => schedule::fedora::sync(&http, &sync).await?,
